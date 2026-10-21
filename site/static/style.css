@@ -1,0 +1,58 @@
+:root {
+  --bg: #f7f8fa; --surface: #ffffff; --text: #1d2330; --muted: #5b6475; --line: #e3e6ec;
+  --accent: #0b6bcb; --accent-text: #ffffff; --urgent: #c2410c; --urgent-bg: #fff1e8; --badge-bg: #e8f1fb; --closed-bg: #eceef2;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12151b; --surface: #1b1f27; --text: #e6e9ef; --muted: #a0a8b8; --line: #2c323d;
+    --accent: #5aa7f0; --accent-text: #0d1117; --urgent: #fb923c; --urgent-bg: #3a2416; --badge-bg: #1e2f44; --closed-bg: #2a2f38;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif; line-height: 1.7; }
+a { color: var(--accent); }
+.wrap { max-width: 960px; margin: 0 auto; padding: 0 16px; }
+.site-header { background: var(--surface); border-bottom: 1px solid var(--line); }
+.site-header .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding-top: 12px; padding-bottom: 12px; }
+.brand { font-weight: 700; font-size: 1.15rem; text-decoration: none; color: var(--text); }
+.site-header nav { display: flex; gap: 16px; font-size: .9rem; }
+.site-header nav a { text-decoration: none; color: var(--muted); }
+main.wrap { padding-top: 24px; padding-bottom: 48px; }
+h1 { font-size: 1.5rem; line-height: 1.4; margin: 0 0 12px; }
+h2 { font-size: 1.15rem; margin: 32px 0 12px; }
+.lead { color: var(--muted); }
+.hero p { color: var(--muted); }
+.filters { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; margin: 20px 0 8px; }
+.filters input[type=search], .filters select { width: 100%; padding: 10px 12px; font-size: 1rem; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); }
+.filters .chk { grid-column: 1 / -1; font-size: .9rem; color: var(--muted); }
+.count { color: var(--muted); font-size: .9rem; }
+.cards { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.card a { display: block; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; text-decoration: none; color: var(--text); }
+.card a:hover { border-color: var(--accent); }
+.card h3 { font-size: 1rem; margin: 6px 0; line-height: 1.5; }
+.card-top { display: flex; gap: 8px; align-items: center; font-size: .8rem; color: var(--muted); }
+.meta { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: .85rem; color: var(--muted); }
+.badge { background: var(--badge-bg); color: var(--accent); padding: 1px 8px; border-radius: 999px; font-weight: 600; }
+.badge.urgent { background: var(--urgent-bg); color: var(--urgent); }
+.badge.closed { background: var(--closed-bg); color: var(--muted); }
+.badge.soon { background: var(--closed-bg); color: var(--text); }
+.crumbs { font-size: .85rem; color: var(--muted); margin-bottom: 12px; }
+.facts { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin: 16px 0; }
+.facts th, .facts td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: .92rem; }
+.facts th { width: 9em; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.btn { display: inline-block; background: var(--accent); color: var(--accent-text); padding: 12px 18px; border-radius: 8px; text-decoration: none; font-weight: 700; }
+.detail .body p { margin: 0 0 10px; }
+.detail .body h3 { font-size: 1rem; margin: 20px 0 8px; }
+.docs { padding-left: 1.2em; }
+.note { font-size: .85rem; color: var(--muted); }
+.related a { margin-right: 12px; }
+.prefs { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.prefs li a, .prefs li.empty { display: flex; justify-content: space-between; padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; text-decoration: none; color: var(--text); }
+.prefs li.empty { color: var(--muted); }
+.prefs span { color: var(--muted); font-size: .85rem; }
+.site-footer { border-top: 1px solid var(--line); background: var(--surface); font-size: .8rem; color: var(--muted); padding: 16px 0 24px; }
+@media (max-width: 640px) {
+  .filters { grid-template-columns: 1fr; }
+  .facts th { width: 6.5em; white-space: normal; }
+  h1 { font-size: 1.3rem; }
+}
