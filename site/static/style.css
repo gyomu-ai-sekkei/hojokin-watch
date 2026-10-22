@@ -93,9 +93,19 @@ section { margin: 36px 0; }
 .t-count { grid-row: 1; grid-column: 2; font-size: .82rem; color: var(--muted); }
 .t-desc { grid-column: 1 / -1; font-size: .8rem; color: var(--muted); line-height: 1.6; }
 
-/* 地域 */
-.region { margin-bottom: 12px; }
-.region h3 { margin: 0 0 6px; font-size: .9rem; color: var(--muted); }
+/* 地域（地域 → 都道府県の2段階） */
+.nat-link { margin: 0 0 10px; }
+.nat-link a { display: inline-block; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 6px; padding: 8px 14px; text-decoration: none; font-weight: 700; }
+.regions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; align-items: start; }
+.region { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.region summary { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 14px; cursor: pointer; font-weight: 700; color: var(--primary-dark); list-style: none; }
+.region summary::-webkit-details-marker { display: none; }
+.region summary::after { content: "＋"; color: var(--primary); font-weight: 700; }
+.region[open] summary::after { content: "－"; }
+.region[open] { grid-column: 1 / -1; }
+.region[open] summary { border-bottom: 1px solid var(--line); }
+.r-count { margin-left: auto; font-size: .82rem; font-weight: 500; color: var(--muted); }
+.region .prefs { padding: 12px; }
 .prefs { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 6px; }
 .prefs.wide { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 .prefs li a, .prefs li.empty { display: flex; justify-content: space-between; gap: 6px; padding: 8px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; text-decoration: none; color: var(--text); font-size: .92rem; }
@@ -149,6 +159,7 @@ section { margin: 36px 0; }
   .filters { grid-template-columns: 1fr 1fr; }
   .filters .f-q { grid-column: 1 / -1; }
   .cards, .tiles { grid-template-columns: 1fr; }
+  .regions { grid-template-columns: 1fr 1fr; }
   .stats { grid-template-columns: repeat(2, 1fr); }
   .steps ol { grid-template-columns: 1fr; }
   .footer-grid { grid-template-columns: 1fr; }

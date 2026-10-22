@@ -524,16 +524,19 @@ foreach ($pref in $Prefectures) {
   Write-File (Join-Path $Dist "area/$slug.html") $html
   [void]$sitemap.Add("area/$slug.html")
 }
+# 地域 → 都道府県の2段階で選ぶ（JavaScriptなしで開閉できる details を使う）
 function Get-PrefGrid([string]$p) {
-  $html = "<div class=""region""><h3>全国</h3><ul class=""prefs""><li><a href=""${p}00.html"">全国対象<span>$($prefCount['全国'])件</span></a></li></ul></div>"
+  $html = "<p class=""nat-link""><a href=""${p}00.html"">全国を対象とした補助金（$($prefCount['全国'])件）</a></p><div class=""regions"">"
   foreach ($r in $Regions.Keys) {
+    $sum = 0
+    foreach ($pref in $Regions[$r]) { $sum += $prefCount[$pref] }
     $lis = ($Regions[$r] | ForEach-Object {
         if ($prefCount[$_] -gt 0) { "<li><a href=""${p}$($PrefSlug[$_]).html"">$(Esc $_)<span>$($prefCount[$_])件</span></a></li>" }
         else { "<li class=""empty"">$(Esc $_)<span>0件</span></li>" }
       }) -join ''
-    $html += "<div class=""region""><h3>$(Esc $r)</h3><ul class=""prefs"">$lis</ul></div>"
+    $html += "<details class=""region""><summary><span class=""r-name"">$(Esc $r)</span><span class=""r-count"">$($sum)件</span></summary><ul class=""prefs"">$lis</ul></details>"
   }
-  $html
+  $html + '</div><p class="note">地域を選ぶと都道府県が表示されます。件数には、複数の都道府県を対象とする補助金を重複して数えています。</p>'
 }
 $body = '<h1>地域から補助金を探す</h1><p class="lead">都道府県を選ぶと、その地域を対象とした受付中の補助金と、全国を対象とした補助金を確認できます。</p>' + (Get-PrefGrid '')
 Write-File (Join-Path $Dist 'area/index.html') (Get-Layout -Title "地域から探す｜都道府県別の補助金・助成金一覧｜$SiteName" -Desc '都道府県ごとに受付中の補助金・助成金を一覧できます。毎日自動更新。' -Body $body -Path 'area/index.html' -Depth 1 -Crumbs @(, @('地域から探す', '', '')))
@@ -595,7 +598,8 @@ $data = @($open | ForEach-Object {
 Write-File (Join-Path $Dist 'data.json') (ConvertTo-JsonText $data)
 
 # ---------- トップ ----------
-$prefOptions = ($Prefectures | ForEach-Object { "<option>$(Esc $_)</option>" }) -join ''
+$prefOptions = '<option>全国</option>'
+foreach ($r in $Regions.Keys) { $prefOptions += "<optgroup label=""$(Esc $r)"">" + (($Regions[$r] | ForEach-Object { "<option>$(Esc $_)</option>" }) -join '') + '</optgroup>' }
 $purposeOptions = ($Purposes.Keys | Where-Object { $purposeCount[$_] -gt 0 } | ForEach-Object { "<option>$(Esc $Purposes[$_][1])</option>" }) -join ''
 $prefsWithItems = @($Prefectures | Where-Object { $_ -ne '全国' -and $prefCount[$_] -gt 0 }).Count
 $initial = @($accepting | Select-Object -First 20)
