@@ -256,6 +256,9 @@ function Get-Card($rec, [string]$p) {
 if (Test-Path $Dist) { Remove-Item -Recurse -Force $Dist }
 New-Item -ItemType Directory -Force (Join-Path $Dist 'assets') | Out-Null
 Copy-Item (Join-Path $StaticDir '*') (Join-Path $Dist 'assets') -Recurse
+# サイト直下に置くファイル（Search Consoleの所有権確認ファイルなど）
+$RootDir = Join-Path $PSScriptRoot 'root'
+if (Test-Path $RootDir) { Copy-Item (Join-Path $RootDir '*') $Dist -Recurse }
 
 $open = @($all | Where-Object { (Get-Status $_) -ne 'closed' })
 $sitemap = New-Object System.Collections.ArrayList
