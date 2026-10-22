@@ -32,6 +32,9 @@ $SiteName = '補助金ウォッチ'
 $SiteUrl = "$env:SITE_URL".TrimEnd('/')
 $ContactEmail = "$env:CONTACT_EMAIL"
 $ReportUrl = "$env:REPORT_URL"
+$CfToken = "$env:CF_BEACON_TOKEN"   # Cloudflare Web Analytics のサイト用トークン（公開される値。未設定なら計測タグを出さない）
+$TokyoCache = Join-Path $Root 'data/tokyo.json'
+$EmploymentPath = Join-Path $Root 'data/employment_subsidies.json'
 if (-not $ReportUrl) { $ReportUrl = 'https://github.com/gyomu-ai-sekkei/hojokin-watch/issues' }
 $BasePath = '/'
 if ($SiteUrl) { $BasePath = ([uri]$SiteUrl).AbsolutePath.TrimEnd('/') + '/' }
@@ -238,6 +241,36 @@ foreach ($id in @($Cache.Keys)) {
 $all = @($Cache.Values | Sort-Object { $_.end })
 Write-File $CachePath (ConvertTo-Json -InputObject $all -Depth 6)
 
+# ---------- 東京都「TOKYO補助金サーチ見える化ボード」データ一覧（CC BY） ----------
+# 年度ごとのCSV（Shift_JIS）。締切は含まれない制度一覧なので、Ｊグランツの案件とは別のページで扱う。
+$TokyoTargets = @('民間団体', '一般都民', 'その他団体')
+if (-not $SkipFetch) {
+  try { [Text.Encoding]::RegisterProvider([Text.CodePagesEncodingProvider]::Instance) } catch { }
+  $fy = $Now.Year; if ($Now.Month -lt 4) { $fy-- }
+  foreach ($y in @($fy, ($fy - 1))) {
+    try {
+      $bytes = $Http.GetByteArrayAsync("https://www.opendata.metro.tokyo.lg.jp/zaimu/hojokin$y.csv").GetAwaiter().GetResult()
+      $text = [Text.Encoding]::GetEncoding(932).GetString($bytes)
+      if ($text -notmatch '補助金名') { $text = [Text.Encoding]::UTF8.GetString($bytes) }
+      $rows = @($text | ConvertFrom-Csv | Where-Object { $TokyoTargets -contains $_.'補助対象者' })
+      if ($rows.Count -lt 10) { throw "too few rows: $($rows.Count)" }
+      $items = @($rows | ForEach-Object {
+          [ordered]@{ year = $_.'年度'; bureau = $_.'所管局'; field = $_.'施策分野'; project = $_.'事業名'; name = $_.'補助金名'; summary = $_.'補助金の概要'
+            target = $_.'補助対象者'; budget = $_.'予算額（千円）'; dept = $_.'所管部署'; contact = $_.'問い合わせ先'; url = $_.'各局HPリンク' }
+        })
+      Write-File $TokyoCache (ConvertTo-Json -InputObject ([ordered]@{ year = $y; fetched = $Now.ToString('yyyy-MM-dd'); items = $items }) -Depth 4)
+      Write-Host "tokyo: $y $($items.Count) items"
+      break
+    } catch { Write-Warning "tokyo $y failed: $_" }
+  }
+}
+$Tokyo = $null
+if (Test-Path $TokyoCache) { $Tokyo = [IO.File]::ReadAllText($TokyoCache, $Utf8) | ConvertFrom-Json }
+$tokyoCount = 0
+if ($Tokyo -and $Tokyo.items) { $tokyoCount = @($Tokyo.items).Count }
+$Employment = $null
+if (Test-Path $EmploymentPath) { $Employment = [IO.File]::ReadAllText($EmploymentPath, $Utf8) | ConvertFrom-Json }
+
 # ---------- 表示用の派生情報 ----------
 function Get-Status($rec) {
   $end = ConvertTo-Jst $rec.end
@@ -299,6 +332,8 @@ function Get-Layout {
   }
   if ($JsonLd) { [void]$head.Add("<script type=""application/ld+json"">$JsonLd</script>") }
   $headExtra = $head -join "`n"
+  $beacon = ''
+  if ($CfToken) { $beacon = "<script defer src=""https://static.cloudflareinsights.com/beacon.min.js"" data-cf-beacon='{""token"": ""$(Esc $CfToken)""}'></script>" }
   @"
 <!doctype html>
 <html lang="ja">
@@ -332,7 +367,7 @@ $headExtra
     </form>
   </div>
   <nav class="gnav" aria-label="メインメニュー"><div class="wrap">
-    <a href="${p}index.html#search">補助金を探す</a><a href="${p}deadline.html">締切間近</a><a href="${p}new.html">新着</a><a href="${p}area/index.html">地域から探す</a><a href="${p}purpose/index.html">目的から探す</a><a href="${p}guide.html">はじめての方へ</a><a href="${p}faq.html">よくある質問</a>
+    <a href="${p}index.html#search">補助金を探す</a><a href="${p}deadline.html">締切間近</a><a href="${p}new.html">新着</a><a href="${p}area/index.html">地域から探す</a><a href="${p}purpose/index.html">目的から探す</a><a href="${p}employment.html">雇用の助成金</a><a href="${p}tokyo/index.html">東京都の制度</a><a href="${p}guide.html">はじめての方へ</a>
   </div></nav>
 </header>
 <div class="updated"><div class="wrap">最終更新：$Built（毎朝5時30分ごろに自動更新）／ データ出典：Ｊグランツ（デジタル庁）</div></div>
@@ -352,7 +387,7 @@ $Body
     </div>
     <div>
       <p class="f-head">ご利用案内</p>
-      <ul><li><a href="${p}guide.html">はじめての方へ（探し方と申請の流れ）</a></li><li><a href="${p}faq.html">よくある質問</a></li><li><a href="${p}about.html">運営者情報・運営方針</a></li><li><a href="${p}privacy.html">プライバシーポリシー</a></li><li><a href="$(Esc $ReportUrl)" rel="nofollow noopener" target="_blank">掲載内容の誤りを報告する</a></li></ul>
+      <ul><li><a href="${p}guide.html">はじめての方へ（探し方と申請の流れ）</a></li><li><a href="${p}employment.html">国の雇用関係助成金</a></li><li><a href="${p}tokyo/index.html">東京都の補助金制度一覧</a></li><li><a href="${p}childbirth.html">妊娠・出産で使える国の制度</a></li><li><a href="${p}faq.html">よくある質問</a></li><li><a href="${p}about.html">運営者情報・運営方針</a></li><li><a href="${p}privacy.html">プライバシーポリシー</a></li><li><a href="$(Esc $ReportUrl)" rel="nofollow noopener" target="_blank">掲載内容の誤りを報告する</a></li></ul>
     </div>
   </div>
   <div class="wrap f-legal">
@@ -360,6 +395,7 @@ $Body
     <p>&copy; $($Now.Year) $SiteName</p>
   </div>
 </footer>
+$beacon
 </body>
 </html>
 "@
@@ -476,6 +512,21 @@ foreach ($rec in $all) {
   foreach ($a in $areas) { if ($PrefSlug.ContainsKey($a)) { $links += "<a href=""../area/$($PrefSlug[$a]).html"">$(Esc $a)の補助金一覧</a>" } }
   foreach ($pp in $myPurposes) { if ($Purposes.Contains($pp)) { $links += "<a href=""../purpose/$($Purposes[$pp][0]).html"">「$(Esc $Purposes[$pp][1])」の補助金一覧</a>" } }
 
+  # 締切をカレンダーに登録する（Googleカレンダーのリンクと、iPhone・Outlook向けの .ics ファイル）
+  $calHtml = ''
+  if ($status -ne 'closed' -and $end) {
+    $d1 = $end.ToString('yyyyMMdd'); $d2 = $end.AddDays(1).ToString('yyyyMMdd')
+    $pageUrl = "$SiteUrl/s/$($rec.id).html"
+    $calText = "【締切】$($rec.title)"
+    $calDetails = "受付締切：$(Format-Date $end)`n詳細：$pageUrl"
+    $gcal = 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=' + [uri]::EscapeDataString($calText) + "&dates=$d1/$d2&details=" + [uri]::EscapeDataString($calDetails)
+    $icsEsc = { param($s) ("$s" -replace '\\', '\\' -replace ';', '\;' -replace ',', '\,' -replace "`n", '\n') }
+    $stamp = [DateTime]::UtcNow.ToString("yyyyMMdd'T'HHmmss'Z'")
+    $ics = "BEGIN:VCALENDAR`r`nVERSION:2.0`r`nPRODID:-//hojokin-watch//JA`r`nCALSCALE:GREGORIAN`r`nBEGIN:VEVENT`r`nUID:$($rec.id)@hojokin-watch`r`nDTSTAMP:$stamp`r`nDTSTART;VALUE=DATE:$d1`r`nDTEND;VALUE=DATE:$d2`r`nSUMMARY:$(& $icsEsc $calText)`r`nDESCRIPTION:$(& $icsEsc $calDetails)`r`nURL:$pageUrl`r`nBEGIN:VALARM`r`nTRIGGER:-P7D`r`nACTION:DISPLAY`r`nDESCRIPTION:$(& $icsEsc ('締切まであと7日：' + $rec.title))`r`nEND:VALARM`r`nEND:VEVENT`r`nEND:VCALENDAR`r`n"
+    Write-File (Join-Path $Dist "s/$($rec.id).ics") $ics
+    $calHtml = "<p class=""cal"">締切をカレンダーに登録する：<a href=""$(Esc $gcal)"" rel=""nofollow noopener"" target=""_blank"">Googleカレンダー</a>／<a href=""$($rec.id).ics"" download>iPhone・Outlookなど（.ics）</a><br><span class=""note"">締切日の予定と、7日前の通知が登録されます。</span></p>"
+  }
+
   $fetched = $rec.detailFetched
   if (-not $fetched) { $fetched = $rec.lastSeen }
   $body = @"
@@ -485,7 +536,7 @@ foreach ($rec in $all) {
 $catch
 <section class="box summary"><h2>この補助金の要点</h2><p>$(Esc $sum)</p></section>
 <table class="facts">$table</table>
-<div class="cta"><a class="btn" href="$(Esc $official)" rel="nofollow noopener" target="_blank">公式ページ（Ｊグランツ）で詳細を確認する</a><p class="note">申請はＪグランツから行います。当サイトでは申請の受付・代行は行っていません。</p></div>
+<div class="cta"><a class="btn" href="$(Esc $official)" rel="nofollow noopener" target="_blank">公式ページ（Ｊグランツ）で詳細を確認する</a><p class="note">申請はＪグランツから行います。当サイトでは申請の受付・代行は行っていません。</p>$calHtml</div>
 <section><h2>概要（公式の掲載内容より）</h2><div class="body">$bodyLines</div></section>
 $docs
 $checklist
@@ -515,6 +566,9 @@ foreach ($pref in $Prefectures) {
     $body = "<h1>全国を対象とした補助金・助成金（受付中 $($local.Count)件）</h1><p class=""lead"">地域を問わず申請できる補助金を、締切が近い順に並べています。</p>" + (Get-CardList $local '../')
   } else {
     $body = "<h1>$(Esc $pref)の補助金・助成金（受付中 $($local.Count)件）</h1><p class=""lead"">Ｊグランツに掲載されている$(Esc $pref)対象の補助金を、締切が近い順に並べています。全国を対象とした補助金も申請できる場合があります。</p>"
+    if ($pref -eq '東京都' -and $tokyoCount -gt 0) {
+      $body += "<p class=""box summary"">Ｊグランツに載っていない東京都独自の補助金も、<a href=""../tokyo/index.html"">東京都の補助金制度一覧（$($tokyoCount)件）</a>で確認できます。</p>"
+    }
     $body += Get-CardList $local '../'
     if ($national.Count -gt 0) {
       $body += "<section><h2>全国を対象とした補助金（締切が近い10件）</h2>" + (Get-CardList ($national | Select-Object -First 10) '../') + "<p class=""more""><a href=""00.html"">全国対象の補助金をすべて見る（$($national.Count)件）</a></p></section>"
@@ -549,7 +603,9 @@ foreach ($key in $Purposes.Keys) {
   $items = @($open | Where-Object { (Split-List $_.purpose) -contains $key })
   $purposeCount[$key] = $items.Count
   if ($items.Count -eq 0) { continue }
-  $body = "<h1>「$(Esc $info[1])」に使える補助金（受付中 $($items.Count)件）</h1><p class=""lead"">$(Esc $info[2])に使える補助金を、締切が近い順に並べています。対象地域や対象経費は補助金ごとに異なるため、公募要領で必ずご確認ください。</p>" + (Get-CardList $items '../')
+  $body = "<h1>「$(Esc $info[1])」に使える補助金（受付中 $($items.Count)件）</h1><p class=""lead"">$(Esc $info[2])に使える補助金を、締切が近い順に並べています。対象地域や対象経費は補助金ごとに異なるため、公募要領で必ずご確認ください。</p>"
+  if (@('employment', 'training', 'childcare') -contains $info[0]) { $body += '<p class="box summary">雇用・人材育成・育児との両立に取り組む事業主は、Ｊグランツ以外で申請する厚生労働省の助成金も利用できる場合があります。<a href="../employment.html">国の雇用関係助成金の一覧を見る ›</a></p>' }
+  $body += (Get-CardList $items '../')
   $html = Get-Layout -Title "$($info[1])の補助金・助成金一覧（受付中$($items.Count)件）｜$SiteName" -Desc "$($info[1])（$($info[2])）に使える受付中の補助金 $($items.Count) 件を締切順に掲載。毎日自動更新。" -Body $body -Path "purpose/$($info[0]).html" -Depth 1 -Crumbs @(@('目的から探す', 'index.html', 'purpose/index.html'), @($info[1], '', ''))
   Write-File (Join-Path $Dist "purpose/$($info[0]).html") $html
   [void]$sitemap.Add("purpose/$($info[0]).html")
@@ -588,6 +644,101 @@ Write-File (Join-Path $Dist 'deadline.html') (Get-Layout -Title "締切間近の
 $body = "<h1>新着の補助金（$($newOnes.Count)件）</h1><p class=""lead"">最近受付が始まった補助金と、当サイトで新しく見つかった補助金です。受付開始日の新しい順に並べています。</p>" + (Get-CardList $newOnes '' '新着の補助金は現在ありません。')
 Write-File (Join-Path $Dist 'new.html') (Get-Layout -Title "新着の補助金・助成金｜$SiteName" -Desc "最近受付が始まった補助金・助成金 $($newOnes.Count) 件。毎日自動更新。" -Body $body -Path 'new.html' -Crumbs @(, @('新着', '', '')))
 [void]$sitemap.Add('new.html')
+
+# ---------- 東京都の補助金制度一覧 ----------
+$TokyoFieldSlug = [ordered]@{
+  '中小企業支援' = 'sme'; '雇用就業' = 'employment'; '観光' = 'tourism'; '農林水産' = 'agriculture'; '環境' = 'environment'; '都市の整備' = 'urban'
+  '子供家庭' = 'children'; '教育' = 'education'; '保健、医療' = 'health'; '高齢者' = 'elderly'; '障害者' = 'disability'; '生活福祉' = 'welfare'
+  '生活文化・スポーツ' = 'culture-sports'; '健康安全、感染症' = 'health-safety'; '国際金融都市、特区・外国企業誘致' = 'international'; '警察と消防' = 'safety'; 'その他' = 'other'
+}
+if ($Tokyo -and $Tokyo.items) {
+  $titems = @($Tokyo.items)
+  $tAttr = "<p class=""source"">出典：東京都財務局「TOKYO補助金サーチ見える化ボード データ一覧（$($Tokyo.year)年度）」（CC BY）をもとに$SiteName 運営者が編集・加工して作成。取得日：$(Esc $Tokyo.fetched)</p>"
+  function Get-TokyoItem($t) {
+    $sumLines = (("$($t.summary)" -split "`r?`n") | ForEach-Object { $_.Trim() } | Where-Object { $_ } | ForEach-Object { "<p>$(Esc ($_ -replace '^[・\s]+', '・'))</p>" }) -join ''
+    $budget = '—'
+    $n = 0.0
+    if ([double]::TryParse(("$($t.budget)" -replace ',', ''), [ref]$n) -and $n -gt 0) { $budget = Format-Yen ($n * 1000) }
+    $link = ''
+    if ("$($t.url)" -match '^https?://') { $link = "<a class=""btn-sub small"" href=""$(Esc $t.url)"" rel=""nofollow noopener"" target=""_blank"">所管局のページで確認する</a>" }
+    @"
+<li class="titem"><h3>$(Esc $t.name)</h3>
+<div class="card-head"><span class="chip">$(Esc $t.target)</span><span class="tag">$(Esc $t.bureau)</span></div>
+<div class="tsum">$sumLines</div>
+<dl class="kv"><div><dt>事業名</dt><dd>$(Esc $t.project)</dd></div><div><dt>予算額（年度）</dt><dd>$(Esc $budget)</dd></div><div><dt>問い合わせ先</dt><dd>$(Esc $t.dept) $(Esc $t.contact)</dd></div></dl>
+$link</li>
+"@
+  }
+  $tokyoNote = '<p class="note">この一覧は、東京都の年度予算に計上されている補助金の制度一覧です（募集期間や締切は含まれていません）。募集の有無や時期、申請方法は、所管局のページで必ずご確認ください。区市町村や政策連携団体だけを対象とした補助金は除いています。</p>'
+  $fieldRows = foreach ($f in $TokyoFieldSlug.Keys) {
+    $fi = @($titems | Where-Object { $_.field -eq $f })
+    if ($fi.Count -eq 0) { continue }
+    $slug = $TokyoFieldSlug[$f]
+    $byTarget = ($TokyoTargets | ForEach-Object { $tg = $_; $c = @($fi | Where-Object { $_.target -eq $tg }).Count; if ($c) { "$($tg) $($c)件" } }) -join '・'
+    # 特定の団体（協会・公社・財団など）向けの補助金は後ろに回し、広く募集されていそうなものを先に表示する
+    $sorted = @($fi | Sort-Object @{ Expression = { if (("$($_.summary)" -split "`n" | Where-Object { $_ -match '補助対象者' }) -match '協会|公社|財団|機構|センター|大学|研究所|基金|連合会|交付金') { 1 } else { 0 } } },
+      @{ Expression = { $v = 0.0; [void][double]::TryParse(("$($_.budget)" -replace ',', ''), [ref]$v); $v }; Descending = $true })
+    $body = "<h1>東京都の補助金制度：$(Esc $f)（$($fi.Count)件）</h1>$tokyoNote<p class=""lead"">対象者の内訳：$(Esc $byTarget)。特定の団体だけを対象とした補助金は後ろに並べています。</p><ul class=""titems"">" + (($sorted | ForEach-Object { Get-TokyoItem $_ }) -join '') + "</ul>$tAttr"
+    Write-File (Join-Path $Dist "tokyo/$slug.html") (Get-Layout -Title "東京都の補助金制度一覧：$f（$($fi.Count)件）｜$SiteName" -Desc "東京都が予算に計上している「$f」分野の補助金 $($fi.Count) 件。対象者、概要、予算額、問い合わせ先、所管局のページへのリンクをまとめています。" -Body $body -Path "tokyo/$slug.html" -Depth 1 -Crumbs @(@('東京都の補助金制度', 'index.html', 'tokyo/index.html'), @($f, '', '')))
+    [void]$sitemap.Add("tokyo/$slug.html")
+    "<li><a href=""$slug.html""><span class=""t-name"">$(Esc $f)</span><span class=""t-desc"">$(Esc $byTarget)</span><span class=""t-count"">$($fi.Count)件</span></a></li>"
+  }
+  $residents = @($titems | Where-Object { $_.target -eq '一般都民' })
+  $body = "<h1>東京都の補助金制度一覧（$($Tokyo.year)年度・$($tokyoCount)件）</h1><p class=""lead"">東京都が公開しているオープンデータから、事業者・団体・都民が対象となる補助金を分野別にまとめました。Ｊグランツに掲載されていない東京都独自の制度も確認できます。</p>$tokyoNote<section><h2>分野から探す</h2><ul class=""tiles"">$($fieldRows -join '')</ul></section>"
+  if ($residents.Count -gt 0) { $body += "<section><h2>都民（個人）が対象の補助金（$($residents.Count)件）</h2><ul class=""titems"">" + (($residents | ForEach-Object { Get-TokyoItem $_ }) -join '') + '</ul></section>' }
+  $body += "<section><h2>受付中の補助金も確認する</h2><p><a href=""../area/13.html"">東京都で受付中の補助金（Ｊグランツ掲載・締切つき）を見る ›</a></p></section>$tAttr"
+  Write-File (Join-Path $Dist 'tokyo/index.html') (Get-Layout -Title "東京都の補助金制度一覧（$($Tokyo.year)年度・$($tokyoCount)件）｜分野別｜$SiteName" -Desc "東京都の補助金 $tokyoCount 件を分野別に一覧。中小企業支援、雇用、観光、環境、子育てなど。対象者、概要、予算額、問い合わせ先を掲載。" -Body $body -Path 'tokyo/index.html' -Depth 1 -Crumbs @(, @('東京都の補助金制度', '', '')))
+  [void]$sitemap.Add('tokyo/index.html')
+}
+
+# ---------- 国の雇用関係助成金（厚生労働省） ----------
+if ($Employment) {
+  $toc = ($Employment.categories | ForEach-Object { "<li><a href=""#$($_.slug)"">$(Esc $_.name)</a></li>" }) -join ''
+  $secs = ($Employment.categories | ForEach-Object {
+      $lis = ($_.items | ForEach-Object { "<li class=""titem""><h3>$(Esc $_.name)</h3><p>$(Esc $_.desc)</p><a class=""btn-sub small"" href=""$(Esc $_.url)"" rel=""nofollow noopener"" target=""_blank"">厚生労働省のページで要件・支給額を確認する</a></li>" }) -join ''
+      "<section id=""$($_.slug)""><h2>$(Esc $_.name)</h2><ul class=""titems"">$lis</ul></section>"
+    }) -join ''
+  $body = @"
+<h1>国の雇用関係助成金（厚生労働省）の主な一覧</h1>
+<p class="lead">従業員の雇用、待遇の改善、出産・育児との両立、人材育成などに取り組む事業主が利用できる、厚生労働省の主な助成金をまとめました。これらの多くはＪグランツではなく、都道府県労働局やハローワークで申請します。</p>
+<section class="box summary"><h2>補助金との違い</h2><p>雇用関係の助成金は、一般に、要件を満たせば受給できるものが多いのが特徴です（予算の範囲内）。一方で、就業規則の整備や計画の届出など、取り組みの前に必要な手続きがあるコースも多いため、取り組みを始める前に要件を確認することが大切です。</p></section>
+<nav class="box toc"><h2>目的から選ぶ</h2><ul>$toc</ul></nav>
+$secs
+<section class="box warn"><h2>ご注意ください</h2><ul><li>支給額や要件は年度ごとに改正されます。必ず厚生労働省の最新の支給要領・パンフレットをご確認ください。</li><li>厚生労働省は、助成金の申請代行や「無料査定」をうたう勧誘への注意を呼びかけています。</li></ul></section>
+<p class="source">出典：厚生労働省「取組内容別雇用関係助成金一覧」をもとに$SiteName 運営者が要約して作成。確認日：$(Esc $Employment.checked)</p>
+"@
+  Write-File (Join-Path $Dist 'employment.html') (Get-Layout -Title "国の雇用関係助成金の一覧（キャリアアップ・両立支援・人材開発など）｜$SiteName" -Desc '厚生労働省の主な雇用関係助成金を目的別に一覧。キャリアアップ助成金、両立支援等助成金（出産・育児）、人材開発支援助成金、トライアル雇用助成金など。' -Body $body -Path 'employment.html' -Crumbs @(, @('国の雇用関係助成金', '', '')))
+  [void]$sitemap.Add('employment.html')
+}
+
+# ---------- 妊娠・出産で使える国の制度（個人向けガイド） ----------
+$childbirth = @"
+<h1>妊娠・出産で使える国の制度まとめ</h1>
+<p class="lead">妊娠から出産、育児休業までの間に利用できる、主な国の制度をまとめました。金額や条件は、加入している健康保険・雇用保険やお住まいの市区町村によって異なる場合があります。必ずリンク先の公式情報をご確認ください。</p>
+<p class="note">確認日：2026年10月22日。当サイトは主に事業者向けの補助金情報サイトのため、このページでは国の代表的な制度だけを紹介しています。市区町村独自の助成は、お住まいの自治体の窓口・ホームページでご確認ください。</p>
+
+<section><h2>妊娠中</h2>
+<ul class="titems">
+<li class="titem"><h3>妊婦のための支援給付</h3><p>妊娠届出の後の面談などとあわせて、市区町村から給付金が支給される制度です（妊娠届出時に5万円、妊娠後期以降にお子さんの数×5万円）。申請方法は市区町村によって異なります。</p><a class="btn-sub small" href="https://www.cfa.go.jp/policies/shussan-kosodate" rel="nofollow noopener" target="_blank">こども家庭庁のページ</a></li>
+<li class="titem"><h3>妊婦健康診査の公費負担</h3><p>妊婦健診の費用は、市区町村が交付する受診票によって公費で助成されます。助成の回数や金額は市区町村によって異なります。</p></li>
+</ul></section>
+
+<section><h2>出産のとき</h2>
+<ul class="titems">
+<li class="titem"><h3>出産育児一時金</h3><p>健康保険に加入している方が出産したとき、子ども1人につき原則50万円が支給されます。医療機関に直接支払われる「直接支払制度」を使えば、窓口での負担を抑えられます。</p><p class="note">出産費用の自己負担をなくす新しい制度を定めた法律が2026年6月に公布されましたが、施行日は2026年10月22日時点で決まっていません。当面は出産育児一時金と併存する見込みと報じられています。</p><a class="btn-sub small" href="https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/kenkou_iryou/iryouhoken/shussan/index.html" rel="nofollow noopener" target="_blank">厚生労働省のページ</a></li>
+</ul></section>
+
+<section><h2>産休・育休中</h2>
+<ul class="titems">
+<li class="titem"><h3>出産手当金（健康保険）</h3><p>会社員などが出産のために仕事を休み、給与が支払われないときに支給されます。出産日（予定日）以前42日（多胎の場合は98日）から出産の翌日以後56日までの期間が対象で、1日あたりの金額は標準報酬日額のおおむね3分の2です。国民健康保険には原則ありません。</p><a class="btn-sub small" href="https://www.kyoukaikenpo.or.jp/benefit/childbirth/001/index.html" rel="nofollow noopener" target="_blank">協会けんぽのページ</a></li>
+<li class="titem"><h3>育児休業給付・出生後休業支援給付・育児時短就業給付（雇用保険）</h3><p>雇用保険に加入している方が育児休業を取ったときに支給されます。両親がともに一定期間育児休業を取った場合の上乗せ（出生後休業支援給付）や、2歳未満の子を育てるための時短勤務中の給付（育児時短就業給付）もあります。</p><a class="btn-sub small" href="https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000135090_00001.html" rel="nofollow noopener" target="_blank">厚生労働省のページ</a></li>
+<li class="titem"><h3>国民年金保険料の産前産後期間の免除</h3><p>国民年金の第1号被保険者（自営業の方など）は、出産予定日の前月から4か月間（多胎の場合は6か月間）の保険料が免除されます。届出が必要です。</p><a class="btn-sub small" href="https://www.nenkin.go.jp/service/kokunen/menjo/20180810.html" rel="nofollow noopener" target="_blank">日本年金機構のページ</a></li>
+</ul></section>
+
+<section class="box summary"><h2>事業者の方へ：従業員の出産・育児を支援すると使える助成金</h2><p>従業員の育児休業の取得や職場復帰、業務の代替体制づくりに取り組む中小企業は、厚生労働省の「両立支援等助成金」を利用できる場合があります。</p><p><a href="employment.html#family">仕事と出産・育児の両立を支援する助成金を見る ›</a></p></section>
+"@
+Write-File (Join-Path $Dist 'childbirth.html') (Get-Layout -Title "妊娠・出産で使える国の制度まとめ（出産育児一時金・出産手当金・育児休業給付など）｜$SiteName" -Desc '妊娠・出産・育休で使える国の主な制度（妊婦のための支援給付、出産育児一時金、出産手当金、育児休業給付、国民年金保険料の免除）を公式情報へのリンクつきでまとめました。' -Body $childbirth -Path 'childbirth.html' -Crumbs @(, @('妊娠・出産で使える国の制度', '', '')))
+[void]$sitemap.Add('childbirth.html')
 
 # ---------- 検索用データ ----------
 $data = @($open | ForEach-Object {
@@ -644,6 +795,15 @@ $(($initial | ForEach-Object { Get-Card $_ '' }) -join '')
 <section>
   <div class="sec-head"><h2>地域から探す</h2><a href="area/index.html">地域の一覧を見る ›</a></div>
   $(Get-PrefGrid 'area/')
+</section>
+
+<section>
+  <h2>Ｊグランツ以外の制度も探す</h2>
+  <ul class="tiles">
+    <li><a href="employment.html"><span class="t-name">国の雇用関係助成金</span><span class="t-desc">キャリアアップ助成金、両立支援等助成金、人材開発支援助成金など（厚生労働省）</span><span class="t-count">目的別</span></a></li>
+    <li><a href="tokyo/index.html"><span class="t-name">東京都の補助金制度一覧</span><span class="t-desc">東京都のオープンデータから、事業者・団体・都民向けの補助金を分野別に掲載</span><span class="t-count">$($tokyoCount)件</span></a></li>
+    <li><a href="childbirth.html"><span class="t-name">妊娠・出産で使える国の制度</span><span class="t-desc">出産育児一時金、出産手当金、育児休業給付など（個人向け）</span><span class="t-count">ガイド</span></a></li>
+  </ul>
 </section>
 
 <section>
@@ -755,11 +915,16 @@ $contact
 Write-File (Join-Path $Dist 'about.html') (Get-Layout -Title "運営者情報・運営方針｜$SiteName" -Desc "$SiteName の運営者情報、運営方針、データの取得方法、出典、免責事項。" -Body $about -Path 'about.html' -Crumbs @(, @('運営者情報・運営方針', '', '')))
 [void]$sitemap.Add('about.html')
 
+$analyticsPolicy = '<section><h2>アクセス解析について</h2><p>現在、アクセス解析ツールは利用していません。</p></section>'
+if ($CfToken) {
+  $analyticsPolicy = '<section><h2>アクセス解析について</h2><p>本サイトは、サイトの改善のためにCloudflare社のアクセス解析サービス「Cloudflare Web Analytics」を利用しています。このサービスはCookieを使用せず、閲覧したページ、参照元、国・地域、ブラウザや端末の種類などの情報を、個人を特定しない形で集計します。詳しくは<a href="https://www.cloudflare.com/ja-jp/privacypolicy/" rel="nofollow noopener" target="_blank">Cloudflare社のプライバシーポリシー</a>をご確認ください。</p></section>'
+}
 $privacy = @"
 <h1>プライバシーポリシー</h1>
 <section><h2>個人情報の取得について</h2><p>本サイトは現在、氏名・メールアドレスなどの個人情報を取得していません。お問い合わせフォームや会員登録の機能もありません。</p></section>
-<section><h2>アクセス解析・広告について</h2><p>現在、アクセス解析ツールや広告配信サービスは利用していません。今後、これらを導入する場合や、メールでの情報配信を始める場合は、取得する情報、利用目的、第三者提供の有無を本ページに掲載したうえで開始します。</p></section>
+<section><h2>広告・メール配信について</h2><p>現在、広告配信サービスやメールでの情報配信は利用していません。今後これらを始める場合は、取得する情報、利用目的、第三者提供の有無を本ページに掲載したうえで開始します。</p></section>
 <section><h2>外部サービスについて</h2><p>本サイトは、表示のためにGoogle Fontsを利用しています。また、ホスティングにGitHub Pagesを利用しています。これらのサービスの提供元には、ページを表示する際に通常のアクセス情報（IPアドレスなど）が送信されます。</p></section>
+$analyticsPolicy
 <p>制定：2026年10月21日／改定：2026年10月22日</p>
 "@
 Write-File (Join-Path $Dist 'privacy.html') (Get-Layout -Title "プライバシーポリシー｜$SiteName" -Desc "$SiteName のプライバシーポリシー。" -Body $privacy -Path 'privacy.html' -Crumbs @(, @('プライバシーポリシー', '', '')))

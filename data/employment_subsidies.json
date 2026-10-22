@@ -1,0 +1,41 @@
+{
+  "checked": "2026-10-22",
+  "source": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/koyou/kyufukin/index_00059.html",
+  "categories": [
+    { "slug": "maintain", "name": "雇用を維持したい", "items": [
+      { "name": "雇用調整助成金", "desc": "業績の悪化などで事業を縮小せざるを得ないときに、休業・教育訓練・出向によって従業員の雇用を守る事業主を支援します。", "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/koyou/kyufukin/pageL07_20200515.html" },
+      { "name": "産業雇用安定助成金（スキルアップ支援コース）", "desc": "在籍型出向で従業員のスキルアップを図り、復帰後の賃金を出向前より5％以上引き上げる事業主を支援します。", "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000082805_00012.html" }
+    ]},
+    { "slug": "hire", "name": "人を雇い入れたい", "items": [
+      { "name": "特定求職者雇用開発助成金（特定就職困難者コース）", "desc": "高年齢者、障害者、母子家庭の母など、就職が難しい方をハローワーク等の紹介で雇い入れる事業主を支援します。", "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/koyou/kyufukin/tokutei_konnan.html" },
+      { "name": "特定求職者雇用開発助成金（中高年層安定雇用支援コース）", "desc": "就職氷河期世代を含む中高年で、正社員の経験が少ない方を正社員として雇い入れる事業主を支援します。", "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/koyou/kyufukin/chuukou.html" },
+      { "name": "トライアル雇用助成金（一般トライアルコース）", "desc": "職業経験が少ないなどの理由で就職が難しい方を、原則3か月間試行的に雇い入れる事業主を支援します。", "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/koyou/newpage_16286.html" },
+      { "name": "早期再就職支援等助成金（中途採用拡大コース）", "desc": "中途採用者の雇用管理制度を整えたうえで、中途採用を拡大する事業主を支援します。", "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000160737_00001.html" },
+      { "name": "地域雇用開発助成金（地域雇用開発コース）", "desc": "雇用情勢が特に厳しい地域で事業所を設置・整備し、地域の求職者を雇い入れる事業主を支援します。", "url": "https://www.mhlw.go.jp/seisakunitsuite/bunya/koyou_roudou/koyou/kyufukin/chiiki_koyou.html" }
+    ]},
+    { "slug": "environment", "name": "雇用環境・待遇を改善したい", "items": [
+      { "name": "キャリアアップ助成金（正社員化コース）", "desc": "契約社員・パート・派遣社員などの有期雇用労働者等を正社員に転換する事業主を支援します。", "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/part_haken/jigyounushi/career.html" },
+      { "name": "キャリアアップ助成金（賃金規定等改定コース）", "desc": "有期雇用労働者等の基本給の賃金規定を改定し、3％以上引き上げる事業主を支援します。", "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/part_haken/jigyounushi/career.html" },
+      { "name": "キャリアアップ助成金（賞与・退職金制度導入コース）", "desc": "有期雇用労働者等を対象とした賞与または退職金制度を新しく設けて適用する事業主を支援します。", "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/part_haken/jigyounushi/career.html" },
+      { "name": "キャリアアップ助成金（短時間労働者労働時間延長支援コース）", "desc": "有期雇用労働者等が新たに社会保険の適用となる際に、労働時間の延長などで収入を増やす事業主を支援します。", "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/part_haken/jigyounushi/career.html" },
+      { "name": "人材確保等支援助成金（雇用管理制度・雇用環境整備助成コース）", "desc": "人事評価制度などの雇用管理制度や、業務負担を減らす機器の導入を通じて、従業員の定着に取り組む事業主を支援します。", "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000199292_00005.html" },
+      { "name": "人材確保等支援助成金（テレワークコース）", "desc": "適切な労務管理のもとでテレワークを導入・実施し、離職率の低下に取り組む中小企業を支援します。", "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/telework_zyosei_R3.html" },
+      { "name": "人材確保等支援助成金（外国人労働者就労環境整備助成コース）", "desc": "就業規則の多言語化など、外国人労働者が働きやすい環境を整える事業主を支援します。", "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/koyou/kyufukin/gaikokujin.html" },
+      { "name": "65歳超雇用推進助成金（65歳超継続雇用促進コース）", "desc": "65歳以上への定年の引き上げや、定年制度の廃止などを実施する事業主を支援します。", "url": "https://www.mhlw.go.jp/stf/newpage_52738.html" }
+    ]},
+    { "slug": "family", "name": "仕事と出産・育児・介護の両立を支援したい", "items": [
+      { "name": "両立支援等助成金（出生時両立支援コース）", "desc": "男性従業員の育児休業取得を推進する中小企業を支援します（子育てパパ支援助成金）。", "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/kodomo/shokuba_kosodate/ryouritsu01/" },
+      { "name": "両立支援等助成金（育児休業等支援コース）", "desc": "従業員が円滑に育児休業を取得し、職場に復帰できるよう取り組む中小企業を支援します。", "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/kodomo/shokuba_kosodate/ryouritsu01/" },
+      { "name": "両立支援等助成金（育休中等業務代替支援コース）", "desc": "育児休業や育児のための短時間勤務をする従業員の業務を、ほかの従業員や新たな雇用で代替する体制を整える中小企業を支援します。", "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/kodomo/shokuba_kosodate/ryouritsu01/index.html" },
+      { "name": "両立支援等助成金（柔軟な働き方選択制度等支援コース）", "desc": "育児中の従業員が使える柔軟な働き方の制度を導入し、利用を支援する中小企業を支援します。", "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/kodomo/shokuba_kosodate/ryouritsu01/index.html" },
+      { "name": "両立支援等助成金（介護離職防止支援コース）", "desc": "従業員が仕事と介護を両立できるよう取り組む中小企業を支援します。", "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/kodomo/shokuba_kosodate/ryouritsu01/" },
+      { "name": "両立支援等助成金（不妊治療及び女性の健康課題対応両立支援コース）", "desc": "不妊治療や、月経・更年期などの女性の健康課題に対応できる職場環境を整える事業主を支援します。", "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/kodomo/shokuba_kosodate/ryouritsu01/index.html" }
+    ]},
+    { "slug": "training", "name": "従業員を育成したい", "items": [
+      { "name": "人材開発支援助成金（人材育成支援コース）", "desc": "職務に関連した10時間以上の訓練や、OJTとOFF-JTを組み合わせた訓練を実施する事業主を支援します。", "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/koyou/kyufukin/d01-1.html" },
+      { "name": "人材開発支援助成金（人への投資促進コース）", "desc": "デジタル人材・高度人材の育成、従業員の自発的な学び、定額制（サブスクリプション型）の研修などを支援します。", "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/koyou/kyufukin/d01-1.html" },
+      { "name": "人材開発支援助成金（事業展開等リスキリング支援コース）", "desc": "新規事業の立ち上げなどに伴い、新しい分野で必要な知識や技能を身につける訓練を実施する事業主を支援します。", "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/koyou/kyufukin/d01-1.html" },
+      { "name": "人材開発支援助成金（教育訓練休暇等付与コース）", "desc": "有給の教育訓練休暇制度を導入し、従業員が実際に休暇を取得した事業主を支援します。", "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/koyou/kyufukin/d01-1.html" }
+    ]}
+  ]
+}

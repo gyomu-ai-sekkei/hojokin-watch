@@ -27,13 +27,14 @@ jobs:
         env:
           SITE_URL: ${{ vars.SITE_URL }}
           CONTACT_EMAIL: ${{ vars.CONTACT_EMAIL }}
+          CF_BEACON_TOKEN: ${{ vars.CF_BEACON_TOKEN }}
         run: ./site/build.ps1
 
       - name: Commit data cache
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/subsidies.json
+          git add data/subsidies.json data/tokyo.json
           if ! git diff --staged --quiet; then
             git commit -m "data: daily update"
             git push
