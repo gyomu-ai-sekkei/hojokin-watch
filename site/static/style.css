@@ -160,6 +160,28 @@ section { margin: 36px 0; }
 .cal a { margin: 0 4px; }
 p.box.summary { margin: 16px 0; }
 
+/* 補助金診断 */
+.diag-cta { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; background: #fff8e6; border: 1px solid #f0dfb0; border-left: 5px solid var(--accent); border-radius: var(--radius); padding: 16px 20px; }
+.diag-cta p { margin: 0; }
+.dc-title { font-weight: 700; font-size: 1.05rem; color: #5c4400; }
+.diag .q { margin-bottom: 18px; }
+.q-title { font-weight: 700; margin: 0 0 8px; color: var(--primary-dark); }
+.diag select { padding: 9px 10px; font-size: 1rem; border: 1px solid var(--line-strong); border-radius: 6px; font-family: inherit; min-width: 240px; }
+.opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.opt { display: inline-flex; align-items: center; gap: 6px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; font-size: .92rem; }
+.opt:has(input:checked) { background: var(--primary-soft); border-color: var(--primary); color: var(--primary-dark); font-weight: 700; }
+.d-result { margin-top: 24px; }
+.r-head { font-size: 1.05rem; color: var(--primary-dark); margin: 20px 0 10px; }
+
+/* 主要補助金の解説 */
+.table-wrap { overflow-x: auto; }
+.sched th, .sched td { font-size: .88rem; }
+.sched thead th { background: var(--primary); color: #fff; width: auto; }
+.points { padding-left: 1.2em; }
+.points li { margin-bottom: 6px; }
+.badge.open { background: var(--ok-bg); color: var(--ok); }
+.cta .btn { margin: 4px; }
+
 /* フッター */
 .site-footer { background: #1f2a37; color: #cfd6df; font-size: .85rem; padding-top: 32px; }
 .site-footer a { color: #e6ebf1; }

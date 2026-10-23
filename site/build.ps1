@@ -35,6 +35,7 @@ $ReportUrl = "$env:REPORT_URL"
 $CfToken = "$env:CF_BEACON_TOKEN"   # Cloudflare Web Analytics のサイト用トークン（公開される値。未設定なら計測タグを出さない）
 $TokyoCache = Join-Path $Root 'data/tokyo.json'
 $EmploymentPath = Join-Path $Root 'data/employment_subsidies.json'
+$MajorPath = Join-Path $Root 'data/major_subsidies.json'
 if (-not $ReportUrl) { $ReportUrl = 'https://github.com/gyomu-ai-sekkei/hojokin-watch/issues' }
 $BasePath = '/'
 if ($SiteUrl) { $BasePath = ([uri]$SiteUrl).AbsolutePath.TrimEnd('/') + '/' }
@@ -270,6 +271,8 @@ $tokyoCount = 0
 if ($Tokyo -and $Tokyo.items) { $tokyoCount = @($Tokyo.items).Count }
 $Employment = $null
 if (Test-Path $EmploymentPath) { $Employment = [IO.File]::ReadAllText($EmploymentPath, $Utf8) | ConvertFrom-Json }
+$Major = $null
+if (Test-Path $MajorPath) { $Major = [IO.File]::ReadAllText($MajorPath, $Utf8) | ConvertFrom-Json }
 
 # ---------- 表示用の派生情報 ----------
 function Get-Status($rec) {
@@ -367,7 +370,7 @@ $headExtra
     </form>
   </div>
   <nav class="gnav" aria-label="メインメニュー"><div class="wrap">
-    <a href="${p}index.html#search">補助金を探す</a><a href="${p}deadline.html">締切間近</a><a href="${p}new.html">新着</a><a href="${p}area/index.html">地域から探す</a><a href="${p}purpose/index.html">目的から探す</a><a href="${p}employment.html">雇用の助成金</a><a href="${p}tokyo/index.html">東京都の制度</a><a href="${p}guide.html">はじめての方へ</a>
+    <a href="${p}index.html#search">補助金を探す</a><a href="${p}shindan.html">補助金診断</a><a href="${p}major/index.html">主要な補助金</a><a href="${p}deadline.html">締切間近</a><a href="${p}area/index.html">地域から探す</a><a href="${p}purpose/index.html">目的から探す</a><a href="${p}employment.html">雇用の助成金</a><a href="${p}tokyo/index.html">東京都の制度</a><a href="${p}guide.html">はじめての方へ</a>
   </div></nav>
 </header>
 <div class="updated"><div class="wrap">最終更新：$Built（毎朝5時30分ごろに自動更新）／ データ出典：Ｊグランツ（デジタル庁）</div></div>
@@ -383,7 +386,7 @@ $Body
     </div>
     <div>
       <p class="f-head">補助金を探す</p>
-      <ul><li><a href="${p}deadline.html">締切間近の補助金</a></li><li><a href="${p}new.html">新着の補助金</a></li><li><a href="${p}area/index.html">地域から探す</a></li><li><a href="${p}purpose/index.html">目的から探す</a></li><li><a href="${p}industry/index.html">業種から探す</a></li></ul>
+      <ul><li><a href="${p}shindan.html">補助金診断</a></li><li><a href="${p}major/index.html">主要な補助金の解説</a></li><li><a href="${p}deadline.html">締切間近の補助金</a></li><li><a href="${p}new.html">新着の補助金</a></li><li><a href="${p}area/index.html">地域から探す</a></li><li><a href="${p}purpose/index.html">目的から探す</a></li><li><a href="${p}industry/index.html">業種から探す</a></li></ul>
     </div>
     <div>
       <p class="f-head">ご利用案内</p>
@@ -645,6 +648,103 @@ $body = "<h1>新着の補助金（$($newOnes.Count)件）</h1><p class=""lead"">
 Write-File (Join-Path $Dist 'new.html') (Get-Layout -Title "新着の補助金・助成金｜$SiteName" -Desc "最近受付が始まった補助金・助成金 $($newOnes.Count) 件。毎日自動更新。" -Body $body -Path 'new.html' -Crumbs @(, @('新着', '', '')))
 [void]$sitemap.Add('new.html')
 
+# ---------- 主要な補助金の解説（中小企業庁・ミラサポplusの掲載をもとに要約） ----------
+function Get-FrameStatus($fr) {
+  if (-not $fr.end) { if ($fr.note -match '随時') { return @('open', $fr.note) } else { return @('closed', $fr.note) } }
+  $s = [DateTime]::Parse($fr.start); $e = [DateTime]::Parse($fr.end)
+  $today = $Now.DateTime.Date
+  if ($today -lt $s) { return @('soon', "受付開始前（$($s.ToString('M月d日(ddd)', $Ja))から）") }
+  if ($today -le $e) { $left = ($e - $today).Days; return @('open', "受付中（$($e.ToString('M月d日(ddd)', $Ja))まで・あと$($left)日）") }
+  @('closed', '受付終了（次回の公募は公式サイトで確認）')
+}
+function Get-MajorStatus($m) {
+  # 枠の中でいちばん「受付中」に近い状態を代表として返す
+  $st = @($m.frames | ForEach-Object { , (Get-FrameStatus $_) })
+  foreach ($k in 'open', 'soon', 'closed') { $hit = @($st | Where-Object { $_[0] -eq $k }); if ($hit.Count) { return $hit[0] } }
+  @('closed', '')
+}
+$majorCards = ''
+if ($Major) {
+  $mSource = "<p class=""source"">出典：中小企業庁「ミラサポplus（人気の補助金）」および各補助金の公式サイトの掲載内容をもとに、$SiteName 運営者が要約して作成。確認日：$(Esc $Major.checked)。最新の要件・スケジュールは必ず公式サイトでご確認ください。</p>"
+  foreach ($m in $Major.items) {
+    $rows = ($m.frames | ForEach-Object {
+        $fs = Get-FrameStatus $_
+        $period = $_.note
+        if ($_.end) { $period = "$([DateTime]::Parse($_.start).ToString('yyyy年M月d日(ddd)', $Ja)) 〜 $([DateTime]::Parse($_.end).ToString('M月d日(ddd)', $Ja))" }
+        "<tr><th scope=""row"">$(Esc $_.name)</th><td>$(Esc $_.use)</td><td>$(Esc $period)</td><td><span class=""badge $($fs[0])"">$(Esc $fs[1])</span></td></tr>"
+      }) -join ''
+    $kw = @($m.keywords)
+    $live = @($accepting | Where-Object { $t = $_.title; @($kw | Where-Object { $t -like "*$_*" }).Count -gt 0 } | Select-Object -First 8)
+    $liveHtml = ''
+    if ($live.Count -gt 0) { $liveHtml = "<section><h2>Ｊグランツで受付中の関連する公募（$($live.Count)件）</h2>" + (Get-CardList $live '../') + '</section>' }
+    $officialHtml = ($m.official | ForEach-Object { "<a class=""btn"" href=""$(Esc $_.url)"" rel=""nofollow noopener"" target=""_blank"">$(Esc $_.label)</a>" }) -join ' '
+    $pLinks = (@($m.purposes) | ForEach-Object { $slug = $_; foreach ($k in $Purposes.Keys) { if ($Purposes[$k][0] -eq $slug) { "<a href=""../purpose/$slug.html"">「$(Esc $Purposes[$k][1])」の補助金一覧</a>" } } }) -join ' '
+    $others = ($Major.items | Where-Object { $_.slug -ne $m.slug } | ForEach-Object { "<li><a href=""$($_.slug).html"">$(Esc $_.name)</a></li>" }) -join ''
+    $body = @"
+<article class="detail">
+<h1>$(Esc $m.name)とは？対象者・補助率・上限額・受付スケジュール</h1>
+<p class="lead">$(Esc $m.lead)</p>
+<table class="facts">
+<tr><th scope="row">主な対象者</th><td>$(Esc $m.who)</td></tr>
+<tr><th scope="row">補助率</th><td>$(Esc $m.rate)</td></tr>
+<tr><th scope="row">補助上限額</th><td>$(Esc $m.max)</td></tr>
+</table>
+<section><h2>受付スケジュール（枠ごと）</h2>
+<div class="table-wrap"><table class="facts sched"><thead><tr><th>枠</th><th>主な使い道</th><th>受付期間</th><th>状況</th></tr></thead><tbody>$rows</tbody></table></div>
+<p class="note">状況はこのページの最終更新時点のものです。公募の回や期間は変更されることがあります。</p></section>
+<section><h2>ポイント</h2><ul class="points">$(($m.points | ForEach-Object { "<li>$(Esc $_)</li>" }) -join '')</ul></section>
+<section><h2>活用のイメージ</h2><ul class="points">$(($m.examples | ForEach-Object { "<li>$(Esc $_)</li>" }) -join '')</ul></section>
+<div class="cta">$officialHtml<p class="note">申請は公式サイトの案内に沿って行ってください。当サイトは申請の受付・代行は行っていません。</p></div>
+$liveHtml
+$checklist
+<p class="related-links">$pLinks <a href="../shindan.html">補助金診断で、ほかに使える補助金を探す</a></p>
+<section><h2>ほかの主要な補助金</h2><ul class="docs">$others</ul></section>
+$mSource
+</article>
+"@
+    Write-File (Join-Path $Dist "major/$($m.slug).html") (Get-Layout -Title "$($m.name)とは？補助率・上限額・2026年度の受付スケジュール｜$SiteName" -Desc "$($m.short)の対象者、補助率（$($m.rate)）、上限額（$($m.max)）、枠ごとの受付スケジュール、活用例をわかりやすくまとめました。公式サイトへのリンクつき。" -Body $body -Path "major/$($m.slug).html" -Depth 1 -Crumbs @(@('主要な補助金', 'index.html', 'major/index.html'), @($m.short, '', '')))
+    [void]$sitemap.Add("major/$($m.slug).html")
+    $ms = Get-MajorStatus $m
+    $majorCards += "<li><a href=""$($m.slug).html""><span class=""t-name"">$(Esc $m.short)</span><span class=""t-desc"">補助率 $(Esc $m.rate)／$(Esc $m.max)</span><span class=""t-count""><span class=""badge $($ms[0])"">$(Esc ($ms[1] -replace '（.*', ''))</span></span></a></li>"
+  }
+  $idxBody = "<h1>主要な補助金の解説（2026年度）</h1><p class=""lead"">中小企業がよく利用する国の主要な補助金について、対象者、補助率、上限額、枠ごとの受付スケジュールをまとめました。</p><ul class=""tiles"">$majorCards</ul><p class=""more""><a href=""../shindan.html"">質問に答えて、使える補助金を探す（補助金診断） ›</a></p>$mSource"
+  Write-File (Join-Path $Dist 'major/index.html') (Get-Layout -Title "主要な補助金の解説（持続化・デジタル化・AI導入・省力化・新事業進出・事業承継）｜$SiteName" -Desc '持続化補助金、デジタル化・AI導入補助金、省力化投資補助金、新事業進出・ものづくり補助金、事業承継・M&A補助金の対象者・補助率・上限額・受付スケジュールを解説。' -Body $idxBody -Path 'major/index.html' -Depth 1 -Crumbs @(, @('主要な補助金', '', '')))
+  [void]$sitemap.Add('major/index.html')
+}
+
+# ---------- 補助金診断（質問に答えると使える補助金を表示。処理はブラウザ内のJavaScriptで行う） ----------
+$diagMajor = @()
+if ($Major) { $diagMajor = @($Major.items | ForEach-Object { $ms = Get-MajorStatus $_; [ordered]@{ slug = $_.slug; name = $_.short; rate = $_.rate; max = $_.max; purposes = @($_.purposes); status = $ms[1]; st = $ms[0] } }) }
+$purposeMap = [ordered]@{}
+foreach ($k in $Purposes.Keys) { $purposeMap[$Purposes[$k][1]] = $Purposes[$k][0] }
+$diagData = ConvertTo-JsonText ([ordered]@{ major = $diagMajor; purposeSlug = $purposeMap; tokyoCount = $tokyoCount })
+$diagPrefOptions = '<option value="">選んでください</option><option>全国（地域を問わない）</option>'
+foreach ($r in $Regions.Keys) { $diagPrefOptions += "<optgroup label=""$(Esc $r)"">" + (($Regions[$r] | ForEach-Object { "<option>$(Esc $_)</option>" }) -join '') + '</optgroup>' }
+$diagPurposeOptions = ($Purposes.Keys | ForEach-Object { "<label class=""opt""><input type=""checkbox"" name=""purpose"" value=""$(Esc $Purposes[$_][1])""> $(Esc $Purposes[$_][1])</label>" }) -join ''
+$body = @"
+<h1>補助金診断：3つの質問で、使える補助金を探す</h1>
+<p class="lead">事業所の場所、従業員数、やりたいことを選ぶと、Ｊグランツで受付中の補助金、国の主要な補助金、雇用関係の助成金の中から、条件に合いそうなものを表示します。入力した内容はこのブラウザの中だけで処理し、どこにも送信しません。</p>
+<form id="diag" class="search-box diag" onsubmit="return false">
+  <div class="q"><p class="q-title">Q1. 事業所はどこにありますか？</p><select id="d-pref">$diagPrefOptions</select></div>
+  <div class="q"><p class="q-title">Q2. 従業員数（パート・アルバイトを含む目安）は？</p>
+    <div class="opts">
+      <label class="opt"><input type="radio" name="size" value="5"> 5人以下</label>
+      <label class="opt"><input type="radio" name="size" value="20"> 6〜20人</label>
+      <label class="opt"><input type="radio" name="size" value="100"> 21〜100人</label>
+      <label class="opt"><input type="radio" name="size" value="300"> 101〜300人</label>
+      <label class="opt"><input type="radio" name="size" value="1000"> 301人以上</label>
+    </div></div>
+  <div class="q"><p class="q-title">Q3. 補助金を使ってやりたいことは？（複数選べます）</p><div class="opts">$diagPurposeOptions</div></div>
+  <p><button id="d-run" class="btn" type="button">診断する</button></p>
+</form>
+<div id="d-result" class="d-result" hidden></div>
+<p class="note">診断結果は、掲載データの対象地域・利用目的・従業員数の条件をもとに機械的に絞り込んだ目安です。実際に申請できるかどうかは、必ず各補助金の公募要領でご確認ください。</p>
+<script type="application/json" id="diag-data">$diagData</script>
+<script src="assets/shindan.js" defer></script>
+"@
+Write-File (Join-Path $Dist 'shindan.html') (Get-Layout -Title "補助金診断｜3つの質問で使える補助金・助成金がわかる（無料・登録不要）｜$SiteName" -Desc '事業所の場所、従業員数、やりたいことを選ぶだけで、受付中の補助金、国の主要な補助金、雇用関係の助成金から条件に合いそうなものを表示します。無料・登録不要。' -Body $body -Path 'shindan.html' -Crumbs @(, @('補助金診断', '', '')))
+[void]$sitemap.Add('shindan.html')
+
 # ---------- 東京都の補助金制度一覧 ----------
 $TokyoFieldSlug = [ordered]@{
   '中小企業支援' = 'sme'; '雇用就業' = 'employment'; '観光' = 'tourism'; '農林水産' = 'agriculture'; '環境' = 'environment'; '都市の整備' = 'urban'
@@ -769,6 +869,16 @@ $body = @"
     <li><span class="s-num">$($newOnes.Count)</span><span class="s-label">新着</span></li>
     <li><span class="s-num">$prefsWithItems</span><span class="s-label">対象の都道府県</span></li>
   </ul>
+</section>
+
+<section class="diag-cta">
+  <div><p class="dc-title">どの補助金が使えるかわからない方へ</p><p>事業所の場所・従業員数・やりたいことを選ぶだけで、使えそうな補助金がわかります（無料・登録不要）。</p></div>
+  <a class="btn" href="shindan.html">補助金診断をはじめる</a>
+</section>
+
+<section>
+  <div class="sec-head"><h2>主要な補助金の受付状況</h2><a href="major/index.html">主要な補助金の解説を見る ›</a></div>
+  <ul class="tiles">$($majorCards -replace 'href="', 'href="major/')</ul>
 </section>
 
 <section id="search" class="search-box">
