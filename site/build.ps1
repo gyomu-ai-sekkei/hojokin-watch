@@ -1044,6 +1044,8 @@ if ($SiteUrl) {
   $lastmod = $Now.ToString('yyyy-MM-dd')
   $urls = ($sitemap | ForEach-Object { "<url><loc>$SiteUrl/$_</loc><lastmod>$lastmod</lastmod></url>" }) -join "`n"
   Write-File (Join-Path $Dist 'sitemap.xml') "<?xml version=""1.0"" encoding=""UTF-8""?>`n<urlset xmlns=""http://www.sitemaps.org/schemas/sitemap/0.9"">`n$urls`n</urlset>`n"
+  # robots.txt はドメインの最上位に置いたときだけ検索エンジンに読まれる（独自ドメインで公開している場合のみ出力）
+  if ($BasePath -eq '/') { Write-File (Join-Path $Dist 'robots.txt') "User-agent: *`nAllow: /`n`nSitemap: $SiteUrl/sitemap.xml`n" }
 }
 $notFound = '<h1>ページが見つかりません</h1><p>お探しのページは移動または削除された可能性があります。受付が終了した補助金のページは、一定期間が過ぎると削除されます。</p><p><a class="btn" href="index.html">トップページから補助金を探す</a></p>'
 Write-File (Join-Path $Dist '404.html') (Get-Layout -Title "ページが見つかりません｜$SiteName" -Desc '' -Body $notFound -Path '404.html' -NoIndex -Is404)
