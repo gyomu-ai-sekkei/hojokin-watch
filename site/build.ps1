@@ -708,7 +708,7 @@ $mSource
     $majorCards += "<li><a href=""$($m.slug).html""><span class=""t-name"">$(Esc $m.short)</span><span class=""t-desc"">補助率 $(Esc $m.rate)／$(Esc $m.max)</span><span class=""t-count""><span class=""badge $($ms[0])"">$(Esc ($ms[1] -replace '（.*', ''))</span></span></a></li>"
   }
   $idxBody = "<h1>主要な補助金の解説（2026年度）</h1><p class=""lead"">中小企業がよく利用する国の主要な補助金について、対象者、補助率、上限額、枠ごとの受付スケジュールをまとめました。</p><ul class=""tiles"">$majorCards</ul><p class=""more""><a href=""../shindan.html"">質問に答えて、使える補助金を探す（補助金診断） ›</a></p>$mSource"
-  Write-File (Join-Path $Dist 'major/index.html') (Get-Layout -Title "主要な補助金の解説（持続化・デジタル化・AI導入・省力化・新事業進出・事業承継）｜$SiteName" -Desc '持続化補助金、デジタル化・AI導入補助金、省力化投資補助金、新事業進出・ものづくり補助金、事業承継・M&A補助金の対象者・補助率・上限額・受付スケジュールを解説。' -Body $idxBody -Path 'major/index.html' -Depth 1 -Crumbs @(, @('主要な補助金', '', '')))
+  Write-File (Join-Path $Dist 'major/index.html') (Get-Layout -Title "主要な補助金・助成金の解説と受付状況（2026年度）｜$SiteName" -Desc "$((@($Major.items) | ForEach-Object { $_.short }) -join '、')の対象者・補助率・上限額・受付スケジュールを解説。受付状況は毎日自動更新。" -Body $idxBody -Path 'major/index.html' -Depth 1 -Crumbs @(, @('主要な補助金', '', '')))
   [void]$sitemap.Add('major/index.html')
 }
 
