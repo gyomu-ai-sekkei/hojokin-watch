@@ -1,4 +1,5 @@
 site/dist/
+site/mail-out/
 # 事業の内部資料は公開しない（このPCにだけ置く）
 docs/
 CLAUDE.md

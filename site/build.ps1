@@ -14,6 +14,9 @@
     SITE_URL       公開URL（例 https://example.com/path）。canonical・OGP・sitemap に使う
     CONTACT_EMAIL  運営者情報ページに表示する連絡先（未設定なら表示しない）
     REPORT_URL     掲載内容の誤りを報告する窓口のURL
+    KIT_FORM_ID    メール配信サービスKitの登録フォームID（公開される値。未設定なら登録フォームを出さない）
+  出力（公開しないもの）:
+    site/mail-out/ 週1回のメール（weekly.html・subject.txt・preview.txt）。.github/workflows/newsletter.yml が使う
 #>
 param(
   [switch]$SkipFetch,
@@ -33,6 +36,8 @@ $SiteUrl = "$env:SITE_URL".TrimEnd('/')
 $ContactEmail = "$env:CONTACT_EMAIL"
 $ReportUrl = "$env:REPORT_URL"
 $CfToken = "$env:CF_BEACON_TOKEN"   # Cloudflare Web Analytics のサイト用トークン（公開される値。未設定なら計測タグを出さない）
+$KitFormId = "$env:KIT_FORM_ID" -replace '[^0-9]', ''   # Kitの登録フォームID（数字のみ）
+$MailOut = Join-Path $PSScriptRoot 'mail-out'
 $TokyoCache = Join-Path $Root 'data/tokyo.json'
 $EmploymentPath = Join-Path $Root 'data/employment_subsidies.json'
 $MajorPath = Join-Path $Root 'data/major_subsidies.json'
@@ -386,7 +391,7 @@ $Body
     </div>
     <div>
       <p class="f-head">補助金を探す</p>
-      <ul><li><a href="${p}shindan.html">補助金診断</a></li><li><a href="${p}major/index.html">主要な補助金の解説</a></li><li><a href="${p}deadline.html">締切間近の補助金</a></li><li><a href="${p}new.html">新着の補助金</a></li><li><a href="${p}area/index.html">地域から探す</a></li><li><a href="${p}purpose/index.html">目的から探す</a></li><li><a href="${p}industry/index.html">業種から探す</a></li></ul>
+      <ul><li><a href="${p}shindan.html">補助金診断</a></li><li><a href="${p}major/index.html">主要な補助金の解説</a></li><li><a href="${p}deadline.html">締切間近の補助金</a></li><li><a href="${p}new.html">新着の補助金</a></li><li><a href="${p}weekly.html">今週の補助金まとめ</a></li><li><a href="${p}area/index.html">地域から探す</a></li><li><a href="${p}purpose/index.html">目的から探す</a></li><li><a href="${p}industry/index.html">業種から探す</a></li></ul>
     </div>
     <div>
       <p class="f-head">ご利用案内</p>
@@ -428,6 +433,23 @@ function Get-CardList($items, [string]$p, [string]$empty = '該当する補助�
   $arr = @($items)
   if ($arr.Count -eq 0) { return "<p class=""empty"">$empty</p>" }
   '<ul class="cards">' + (($arr | ForEach-Object { Get-Card $_ $p }) -join '') + '</ul>'
+}
+
+# 週1回のメールの登録フォーム（Kit）。確認メールのリンクを押して登録が完了する二段階の登録（ダブルオプトイン）にする。
+function Get-MailForm([string]$p) {
+  if (-not $KitFormId) { return '' }
+  @"
+<section class="box mailbox" id="mail">
+  <h2>新着・締切間近の補助金を、週1回メールで受け取る（無料）</h2>
+  <p>毎週月曜の朝に、新しく始まった補助金、締切が近い補助金、主要な補助金の受付状況をまとめてお送りします。登録はメールアドレスだけです。届いた確認メールのリンクを押すと登録が完了します。配信はいつでも停止できます。</p>
+  <form class="mailform" action="https://app.kit.com/forms/$KitFormId/subscriptions" method="post">
+    <label for="mail-$KitFormId">メールアドレス</label>
+    <input id="mail-$KitFormId" type="email" name="email_address" required autocomplete="email" placeholder="例：info@example.com">
+    <button type="submit">登録する</button>
+  </form>
+  <p class="note">メールアドレスは、配信サービス「Kit」（米国のKit社）で管理します。<a href="${p}privacy.html#mail">プライバシーポリシー</a>をご確認のうえご登録ください。メールアドレスを第三者に販売することはありません。</p>
+</section>
+"@
 }
 
 if (Test-Path $Dist) { Remove-Item -Recurse -Force $Dist }
@@ -546,6 +568,7 @@ $checklist
 <p class="source">情報の取得日：$(Esc $fetched)／出典：<a href="$(Esc $official)" rel="nofollow noopener" target="_blank">Ｊグランツの掲載ページ</a>（掲載内容を編集・加工しています）</p>
 <p class="related-links">$($links -join ' ')</p>
 $relHtml
+$(Get-MailForm '../')
 </article>
 "@
   $desc = "$($rec.title)｜対象地域：$($areas -join '・')、上限：$(Format-Yen $rec.maxLimit)、締切：$(Format-Date $end)。受付状況、補助率、対象者、概要をまとめています。"
@@ -641,10 +664,10 @@ Write-File (Join-Path $Dist 'industry/index.html') (Get-Layout -Title "業種か
 [void]$sitemap.Add('industry/index.html')
 
 # ---------- 締切間近・新着 ----------
-$body = "<h1>締切間近の補助金（14日以内・$($soon.Count)件）</h1><p class=""lead"">受付締切まで14日以内の補助金です。申請には事業計画の作成やGビズIDの取得など準備に時間がかかるものが多いため、早めに公募要領を確認してください。</p>" + (Get-CardList $soon '')
+$body = "<h1>締切間近の補助金（14日以内・$($soon.Count)件）</h1><p class=""lead"">受付締切まで14日以内の補助金です。申請には事業計画の作成やGビズIDの取得など準備に時間がかかるものが多いため、早めに公募要領を確認してください。</p>" + (Get-CardList $soon '') + (Get-MailForm '')
 Write-File (Join-Path $Dist 'deadline.html') (Get-Layout -Title "締切間近の補助金・助成金（14日以内）｜$SiteName" -Desc "受付締切まで14日以内の補助金・助成金 $($soon.Count) 件。毎日自動更新。" -Body $body -Path 'deadline.html' -Crumbs @(, @('締切間近', '', '')))
 [void]$sitemap.Add('deadline.html')
-$body = "<h1>新着の補助金（$($newOnes.Count)件）</h1><p class=""lead"">最近受付が始まった補助金と、当サイトで新しく見つかった補助金です。受付開始日の新しい順に並べています。</p>" + (Get-CardList $newOnes '' '新着の補助金は現在ありません。')
+$body = "<h1>新着の補助金（$($newOnes.Count)件）</h1><p class=""lead"">最近受付が始まった補助金と、当サイトで新しく見つかった補助金です。受付開始日の新しい順に並べています。</p>" + (Get-CardList $newOnes '' '新着の補助金は現在ありません。') + (Get-MailForm '')
 Write-File (Join-Path $Dist 'new.html') (Get-Layout -Title "新着の補助金・助成金｜$SiteName" -Desc "最近受付が始まった補助金・助成金 $($newOnes.Count) 件。毎日自動更新。" -Body $body -Path 'new.html' -Crumbs @(, @('新着', '', '')))
 [void]$sitemap.Add('new.html')
 
@@ -710,6 +733,72 @@ $mSource
   $idxBody = "<h1>主要な補助金の解説（2026年度）</h1><p class=""lead"">中小企業がよく利用する国の主要な補助金について、対象者、補助率、上限額、枠ごとの受付スケジュールをまとめました。</p><ul class=""tiles"">$majorCards</ul><p class=""more""><a href=""../shindan.html"">質問に答えて、使える補助金を探す（補助金診断） ›</a></p>$mSource"
   Write-File (Join-Path $Dist 'major/index.html') (Get-Layout -Title "主要な補助金・助成金の解説と受付状況（2026年度）｜$SiteName" -Desc "$((@($Major.items) | ForEach-Object { $_.short }) -join '、')の対象者・補助率・上限額・受付スケジュールを解説。受付状況は毎日自動更新。" -Body $idxBody -Path 'major/index.html' -Depth 1 -Crumbs @(, @('主要な補助金', '', '')))
   [void]$sitemap.Add('major/index.html')
+}
+
+# ---------- 今週の補助金まとめ（公開ページ）と、週1回のメール本文（公開しない） ----------
+# 「この7日間に受付が始まった、または初めて見つけた補助金」「14日以内に締切」「主要な補助金の受付状況」をまとめる。
+$weekAgo = $Now.AddDays(-7)
+$weekNew = @($open | Where-Object {
+    $s = ConvertTo-Jst $_.start
+    ($_.firstSeen -and $_.firstSeen -gt $LaunchDate -and [DateTime]::Parse($_.firstSeen) -ge $weekAgo.DateTime.Date) -or ($s -and $s -ge $weekAgo -and $s -le $Now)
+  } | Sort-Object { $_.end })
+$upcoming = @($open | Where-Object { (Get-Status $_) -eq 'upcoming' } | Sort-Object { $_.start })
+$majorRows = @()
+if ($Major) { $majorRows = @($Major.items | ForEach-Object { $ms = Get-MajorStatus $_; [pscustomobject]@{ slug = $_.slug; name = $_.short; st = $ms[0]; text = $ms[1] } }) }
+$weekLabel = "$($Now.ToString('yyyy年M月d日(ddd)', $Ja))時点"
+$majorList = ($majorRows | ForEach-Object { "<li><a href=""major/$($_.slug).html"">$(Esc $_.name)</a> <span class=""badge $($_.st)"">$(Esc $_.text)</span></li>" }) -join ''
+$body = @"
+<h1>今週の補助金まとめ</h1>
+<p class="lead">$($weekLabel)の、この7日間の新着、締切が14日以内の補助金、受付開始前の補助金、国の主要な補助金の受付状況をまとめています。毎朝自動で更新しています。</p>
+<ul class="stats-mini"><li>新着 <strong>$($weekNew.Count)</strong>件</li><li>締切間近 <strong>$($soon.Count)</strong>件</li><li>受付開始前 <strong>$($upcoming.Count)</strong>件</li></ul>
+<section><h2>この7日間の新着（$($weekNew.Count)件）</h2>$(Get-CardList ($weekNew | Select-Object -First 30) '' 'この7日間の新着はありません。')</section>
+<section><div class="sec-head"><h2>締切まで14日以内（$($soon.Count)件）</h2><a href="deadline.html">すべて見る ›</a></div>$(Get-CardList ($soon | Select-Object -First 30) '' '14日以内に締切を迎える補助金はありません。')</section>
+<section><h2>まもなく受付開始（$($upcoming.Count)件）</h2>$(Get-CardList ($upcoming | Select-Object -First 15) '' '受付開始前の補助金はありません。')</section>
+<section><div class="sec-head"><h2>国の主要な補助金の受付状況</h2><a href="major/index.html">解説を見る ›</a></div><ul class="docs">$majorList</ul></section>
+$(Get-MailForm '')
+"@
+Write-File (Join-Path $Dist 'weekly.html') (Get-Layout -Title "今週の補助金まとめ（新着・締切間近・受付開始前）｜$SiteName" -Desc "この7日間に始まった補助金 $($weekNew.Count) 件、締切まで14日以内 $($soon.Count) 件、受付開始前 $($upcoming.Count) 件と、主要な補助金の受付状況。毎朝自動更新。" -Body $body -Path 'weekly.html' -Crumbs @(, @('今週の補助金まとめ', '', '')))
+[void]$sitemap.Add('weekly.html')
+
+# メール本文：メールソフトで崩れないよう、表を使わず文字中心にし、スタイルはタグに直接書く。リンクは絶対URLにする。
+if ($SiteUrl) {
+  function Get-MailItems($items, [int]$max) {
+    $arr = @($items | Select-Object -First $max)
+    if ($arr.Count -eq 0) { return '<p style="margin:0 0 16px;color:#555">該当なし</p>' }
+    $li = ($arr | ForEach-Object {
+        $end = ConvertTo-Jst $_.end
+        $areas = (Split-Areas $_.area) -join '・'
+        "<li style=""margin:0 0 12px""><a href=""$SiteUrl/s/$($_.id).html"" style=""color:#1d4f91;font-weight:bold"">$(Esc $_.title)</a><br><span style=""color:#555;font-size:13px"">締切：$(Esc (Format-Date $end))／上限：$(Esc (Format-Yen $_.maxLimit))／地域：$(Esc $areas)</span></li>"
+      }) -join ''
+    $more = ''
+    if (@($items).Count -gt $max) { $more = "<p style=""margin:0 0 16px;font-size:13px"">ほか $(@($items).Count - $max) 件</p>" }
+    "<ul style=""padding-left:18px;margin:0 0 8px"">$li</ul>$more"
+  }
+  $mailMajor = ($majorRows | ForEach-Object { "<li style=""margin:0 0 6px""><a href=""$SiteUrl/major/$($_.slug).html"" style=""color:#1d4f91"">$(Esc $_.name)</a>：$(Esc $_.text)</li>" }) -join ''
+  $h2 = 'style="font-size:17px;border-left:4px solid #1d4f91;padding-left:8px;margin:24px 0 12px"'
+  $mail = @"
+<div style="font-family:sans-serif;font-size:15px;line-height:1.7;color:#222;max-width:640px">
+<p>$SiteName の週1回のお知らせです（$weekLabel）。新着 $($weekNew.Count) 件、締切まで14日以内 $($soon.Count) 件、受付開始前 $($upcoming.Count) 件でした。</p>
+<h2 $h2>この7日間の新着（$($weekNew.Count)件）</h2>
+$(Get-MailItems $weekNew 15)
+<h2 $h2>締切まで14日以内（$($soon.Count)件）</h2>
+$(Get-MailItems $soon 15)
+<h2 $h2>まもなく受付開始（$($upcoming.Count)件）</h2>
+$(Get-MailItems $upcoming 10)
+<h2 $h2>国の主要な補助金の受付状況</h2>
+<ul style="padding-left:18px;margin:0 0 8px">$mailMajor</ul>
+<p style="margin:24px 0"><a href="$SiteUrl/weekly.html" style="color:#1d4f91;font-weight:bold">サイトで今週のまとめを見る</a>／<a href="$SiteUrl/shindan.html" style="color:#1d4f91">補助金診断で探す</a></p>
+<hr style="border:0;border-top:1px solid #ddd;margin:24px 0">
+<p style="font-size:12px;color:#666">このメールは、$SiteName の配信を登録された方にお送りしています。配信の停止は、このメールの末尾にあるリンクからいつでも行えます。<br>
+送信者：$SiteName（<a href="$SiteUrl/about.html" style="color:#666">運営者情報・住所・お問い合わせ先</a>）<br>
+出典：「Ｊグランツ」（デジタル庁）の掲載情報をもとに $SiteName が編集・加工して作成。当サイトは公式サイトではありません。申請の前に、必ず公式の公募要領をご確認ください。</p>
+</div>
+"@
+  New-Item -ItemType Directory -Force $MailOut | Out-Null
+  Write-File (Join-Path $MailOut 'weekly.html') $mail
+  Write-File (Join-Path $MailOut 'subject.txt') "【補助金ウォッチ】今週の新着 $($weekNew.Count) 件・締切間近 $($soon.Count) 件（$($Now.ToString('M/d', $Ja))）"
+  Write-File (Join-Path $MailOut 'preview.txt') "新着 $($weekNew.Count) 件、締切まで14日以内 $($soon.Count) 件、主要な補助金の受付状況をまとめました。"
+  Write-File (Join-Path $MailOut 'count.txt') "$($weekNew.Count + $soon.Count + $upcoming.Count)"
 }
 
 # ---------- 補助金診断（質問に答えると使える補助金を表示。処理はブラウザ内のJavaScriptで行う） ----------
@@ -919,7 +1008,9 @@ $(($initial | ForEach-Object { Get-Card $_ '' }) -join '')
 <section>
   <div class="sec-head"><h2>新着の補助金</h2><a href="new.html">新着をすべて見る ›</a></div>
   $(Get-CardList ($newOnes | Select-Object -First 6) '' '新着の補助金は現在ありません。')
+  <p class="more"><a href="weekly.html">今週の補助金まとめ（新着・締切間近・主要な補助金の受付状況）を見る ›</a></p>
 </section>
+$(Get-MailForm '')
 
 <section class="box steps">
   <h2>はじめての方へ：補助金申請の流れ</h2>
@@ -1029,10 +1120,20 @@ $analyticsPolicy = '<section><h2>アクセス解析について</h2><p>現在、
 if ($CfToken) {
   $analyticsPolicy = '<section><h2>アクセス解析について</h2><p>本サイトは、サイトの改善のためにCloudflare社のアクセス解析サービス「Cloudflare Web Analytics」を利用しています。このサービスはCookieを使用せず、閲覧したページ、参照元、国・地域、ブラウザや端末の種類などの情報を、個人を特定しない形で集計します。詳しくは<a href="https://www.cloudflare.com/ja-jp/privacypolicy/" rel="nofollow noopener" target="_blank">Cloudflare社のプライバシーポリシー</a>をご確認ください。</p></section>'
 }
+$personalPolicy = '<section><h2>個人情報の取得について</h2><p>本サイトは現在、氏名・メールアドレスなどの個人情報を取得していません。お問い合わせフォームや会員登録の機能もありません。</p></section><section><h2>広告・メール配信について</h2><p>現在、広告配信サービスやメールでの情報配信は利用していません。今後これらを始める場合は、取得する情報、利用目的、第三者提供の有無を本ページに掲載したうえで開始します。</p></section>'
+if ($KitFormId) {
+  $personalPolicy = @'
+<section id="mail"><h2>メール配信で取得する情報と利用目的</h2>
+<p>週1回のメール配信（無料）に登録された場合に限り、メールアドレスを取得します。取得したメールアドレスは、補助金の新着・締切などのお知らせを配信するためだけに利用し、本人の同意なく第三者に提供することはありません（法令に基づく場合を除きます）。登録は、確認メールのリンクを押して完了する二段階の方式です。</p>
+<p>配信の停止は、各メールの末尾にあるリンクからいつでも行えます。登録情報の削除を希望される場合は、運営者情報ページの連絡先までご連絡ください。</p></section>
+<section><h2>外国にある事業者への委託について</h2>
+<p>メールの配信と登録情報の管理は、米国の Kit 社（配信サービス「Kit」）に委託しています。米国には、日本の個人情報保護法に相当する包括的な連邦法はありませんが、州ごとの法律（カリフォルニア州消費者プライバシー法など）があります。外国の制度に関する調査結果は<a href="https://www.ppc.go.jp/" rel="nofollow noopener" target="_blank">個人情報保護委員会のウェブサイト</a>で公表されています。Kit 社の取り扱いは<a href="https://kit.com/privacy" rel="nofollow noopener" target="_blank">Kit 社のプライバシーポリシー</a>をご確認ください。</p></section>
+<section><h2>広告について</h2><p>現在、広告配信サービスは利用していません。今後始める場合は、本ページに掲載したうえで開始します。</p></section>
+'@
+}
 $privacy = @"
 <h1>プライバシーポリシー</h1>
-<section><h2>個人情報の取得について</h2><p>本サイトは現在、氏名・メールアドレスなどの個人情報を取得していません。お問い合わせフォームや会員登録の機能もありません。</p></section>
-<section><h2>広告・メール配信について</h2><p>現在、広告配信サービスやメールでの情報配信は利用していません。今後これらを始める場合は、取得する情報、利用目的、第三者提供の有無を本ページに掲載したうえで開始します。</p></section>
+$personalPolicy
 <section><h2>外部サービスについて</h2><p>本サイトは、表示のためにGoogle Fontsを利用しています。また、ホスティングにGitHub Pagesを利用しています。これらのサービスの提供元には、ページを表示する際に通常のアクセス情報（IPアドレスなど）が送信されます。</p></section>
 $analyticsPolicy
 <p>制定：2026年10月21日／改定：2026年10月22日</p>

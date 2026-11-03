@@ -1,0 +1,55 @@
+name: weekly-newsletter
+
+# 毎週月曜 07:30 JST に、その朝のデータ（daily-build がコミットしたもの）から週1回のメールを作り、Kit に登録する。
+# - リポジトリのシークレット KIT_API_KEY が未設定なら、何もしないで終わる
+# - リポジトリの変数 NEWSLETTER_MODE が "send" のときだけ配信を予約する。それ以外は下書きとして保存する（既定）
+on:
+  schedule:
+    - cron: '30 22 * * 0'   # 毎週月曜 07:30 JST
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  newsletter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build mail
+        shell: pwsh
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+          KIT_FORM_ID: ${{ vars.KIT_FORM_ID }}
+        run: ./site/build.ps1 -SkipFetch
+
+      - name: Create broadcast on Kit
+        shell: pwsh
+        env:
+          KIT_API_KEY: ${{ secrets.KIT_API_KEY }}
+          NEWSLETTER_MODE: ${{ vars.NEWSLETTER_MODE }}
+        run: |
+          if (-not $env:KIT_API_KEY) { Write-Host 'KIT_API_KEY が未設定のため、配信しません'; exit 0 }
+          $dir = './site/mail-out'
+          $utf8 = New-Object System.Text.UTF8Encoding($false)
+          if ([int](Get-Content "$dir/count.txt") -eq 0) { Write-Host '掲載する補助金がないため、今週は配信しません'; exit 0 }
+          $now = [DateTimeOffset]::UtcNow
+          $sendAt = $null
+          if ($env:NEWSLETTER_MODE -eq 'send') { $sendAt = $now.AddMinutes(10).ToString('yyyy-MM-ddTHH:mm:ssZ') }
+          # subscriber_filter を省略すると、全登録者が対象になる
+          $body = [ordered]@{
+            subject      = (Get-Content "$dir/subject.txt" -Raw -Encoding utf8).Trim()
+            preview_text = (Get-Content "$dir/preview.txt" -Raw -Encoding utf8).Trim()
+            content      = [IO.File]::ReadAllText("$dir/weekly.html", $utf8)
+            description  = "週次まとめ $($now.ToOffset([TimeSpan]::FromHours(9)).ToString('yyyy-MM-dd'))"
+            public       = $false
+            published_at = $now.ToString('yyyy-MM-ddTHH:mm:ssZ')
+            send_at      = $sendAt
+          }
+          $json = $body | ConvertTo-Json -Depth 4
+          $res = Invoke-RestMethod -Method Post -Uri 'https://api.kit.com/v4/broadcasts' `
+            -Headers @{ 'X-Kit-Api-Key' = $env:KIT_API_KEY } -ContentType 'application/json; charset=utf-8' `
+            -Body ([Text.Encoding]::UTF8.GetBytes($json))
+          if ($sendAt) { Write-Host "配信を予約しました（broadcast id: $($res.broadcast.id)、送信予定 $sendAt）" }
+          else { Write-Host "下書きとして保存しました（broadcast id: $($res.broadcast.id)）" }
