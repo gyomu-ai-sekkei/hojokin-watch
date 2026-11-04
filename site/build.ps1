@@ -673,7 +673,12 @@ Write-File (Join-Path $Dist 'new.html') (Get-Layout -Title "新着の補助金�
 
 # ---------- 主要な補助金の解説（中小企業庁・ミラサポplusの掲載をもとに要約） ----------
 function Get-FrameStatus($fr) {
-  if (-not $fr.end) { if ($fr.note -match '随時') { return @('open', $fr.note) } else { return @('closed', $fr.note) } }
+  if (-not $fr.end) {
+    if ($fr.note -match '随時') { return @('open', $fr.note) }
+    # 公募の予定が出ているが日付が未確定の枠は「受付開始前」として扱う
+    if ($fr.note -match '予定') { return @('soon', '受付開始前（日程は公式サイトで確認）') }
+    return @('closed', $fr.note)
+  }
   $s = [DateTime]::Parse($fr.start); $e = [DateTime]::Parse($fr.end)
   $today = $Now.DateTime.Date
   if ($today -lt $s) { return @('soon', "受付開始前（$($s.ToString('M月d日(ddd)', $Ja))から）") }
